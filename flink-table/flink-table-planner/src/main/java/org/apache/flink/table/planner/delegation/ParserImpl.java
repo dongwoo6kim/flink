@@ -44,6 +44,8 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.advise.SqlAdvisor;
 import org.apache.calcite.sql.advise.SqlAdvisorValidator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
@@ -57,7 +59,7 @@ import java.util.stream.Collectors;
 
 /** Implementation of {@link Parser} that uses Calcite. */
 public class ParserImpl implements Parser {
-
+    private static final Logger LOG = LoggerFactory.getLogger(ParserImpl.class);
     private final CatalogManager catalogManager;
 
     // we use supplier pattern here in order to use the most up to
@@ -102,6 +104,8 @@ public class ParserImpl implements Parser {
         SqlNodeList sqlNodeList = parser.parseSqlList(statement);
         List<SqlNode> parsed = sqlNodeList.getList();
         Preconditions.checkArgument(parsed.size() == 1, "only single statement supported");
+        LOG.info("sqlNode: {}", parsed.get(0).toString());
+        System.out.println(String.format("sqlNode: %s", parsed.get(0).toString()));
         return Collections.singletonList(
                 SqlToOperationConverter.convert(planner, catalogManager, parsed.get(0))
                         .orElseThrow(() -> new TableException("Unsupported query: " + statement)));

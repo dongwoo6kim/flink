@@ -165,6 +165,8 @@ public class LocalExecutor implements Executor {
             throws SqlExecutionException {
         final ExecutionContext context = getExecutionContext(sessionId);
         final TableEnvironment tableEnv = context.getTableEnvironment();
+        LOG.info("parseStatement: {}", statement);
+        System.out.println(String.format("parseStatement: %s", statement));
         Parser parser = ((TableEnvironmentInternal) tableEnv).getParser();
 
         List<Operation> operations;
@@ -203,6 +205,14 @@ public class LocalExecutor implements Executor {
         final TableEnvironmentInternal tEnv =
                 (TableEnvironmentInternal) context.getTableEnvironment();
         try {
+            LOG.info(
+                    "executeOperation happening in LocalExecuor for operation : {}, {}",
+                    operation,
+                    operation.asSummaryString());
+            System.out.println(
+                    String.format(
+                            "---------executeOperation happening in LocalExecuor, toString: %s, summaryString: %s",
+                            operation, operation.asSummaryString()));
             return tEnv.executeInternal(operation);
         } catch (Throwable t) {
             throw new SqlExecutionException(MESSAGE_SQL_EXECUTION_ERROR, t);

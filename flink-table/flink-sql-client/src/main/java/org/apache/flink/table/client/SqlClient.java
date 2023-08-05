@@ -108,6 +108,7 @@ public class SqlClient {
      * @param executor executor
      */
     private void openCli(String sessionId, Executor executor) {
+        System.out.println("Open Cli, debugging message");
         Path historyFilePath;
         if (options.getHistoryFilePath() != null) {
             historyFilePath = Paths.get(options.getHistoryFilePath());
@@ -148,8 +149,12 @@ public class SqlClient {
             }
 
             if (!hasSqlFile && !hasUpdateStatement) {
+                System.out.println("Start executeInInteractiveMode, debugging message");
+                LOG.info("Start executeInInteractiveMode");
                 cli.executeInInteractiveMode();
             } else {
+                System.out.println("Start executeInNonInteractiveMode, debugging message");
+                LOG.info("Start executeInNonInteractiveMode");
                 cli.executeInNonInteractiveMode(readExecutionContent());
             }
         }

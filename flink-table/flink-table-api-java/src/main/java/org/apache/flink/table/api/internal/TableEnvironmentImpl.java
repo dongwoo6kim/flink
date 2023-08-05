@@ -166,6 +166,9 @@ import org.apache.flink.util.FlinkUserCodeClassLoaders;
 import org.apache.flink.util.MutableURLClassLoader;
 import org.apache.flink.util.Preconditions;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -190,6 +193,8 @@ import static org.apache.flink.table.api.config.TableConfigOptions.TABLE_DML_SYN
  */
 @Internal
 public class TableEnvironmentImpl implements TableEnvironmentInternal {
+    // Logger for debug
+    private static final Logger LOG = LoggerFactory.getLogger(TableEnvironmentImpl.class);
     // Flag that tells if the TableSource/TableSink used in this environment is stream table
     // source/sink,
     // and this should always be true. This avoids too many hard code.
@@ -873,7 +878,13 @@ public class TableEnvironmentImpl implements TableEnvironmentInternal {
         List<Transformation<?>> transformations =
                 translate(Collections.singletonList(sinkOperation));
         final String defaultJobName = "collect";
+        LOG.info("Resolved Schema of operation: {}", operation.getResolvedSchema().toString());
+        System.out.println(
+                String.format("Resolved Schema of operation: %s", operation.getResolvedSchema()));
+        resourceManager.addJarConfiguration(tableConfig);
 
+        LOG.info("Transformations: {}", transformations.toString());
+        System.out.println(String.format("Transformations: %s", transformations));
         resourceManager.addJarConfiguration(tableConfig);
 
         // We pass only the configuration to avoid reconfiguration with the rootConfiguration
@@ -906,6 +917,14 @@ public class TableEnvironmentImpl implements TableEnvironmentInternal {
 
     @Override
     public TableResultInternal executeInternal(Operation operation) {
+        System.out.println(
+                String.format(
+                        "executeInternal() in TableEnvironmentImpl, Operation --- toString: %s, Operation summaryString: %s",
+                        operation, operation.asSummaryString()));
+        LOG.info(
+                "executeInternal() in TableEnvironmentImpl, Operation --- toString: {}, Operation summaryString: {}",
+                operation,
+                operation.asSummaryString());
         // try to use extended operation executor to execute the operation
         Optional<TableResultInternal> tableResult =
                 getExtendedOperationExecutor().executeOperation(operation);

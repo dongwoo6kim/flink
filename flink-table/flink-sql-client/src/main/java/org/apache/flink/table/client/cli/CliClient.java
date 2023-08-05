@@ -324,8 +324,12 @@ public class CliClient implements AutoCloseable {
             if (!parsedOperation.isPresent()) {
                 continue;
             }
-
             // execute the operation
+            printInfo(String.format("parsed command %s", parser.getCommand()));
+            printInfo(
+                    String.format(
+                            "---------About to execute operation, toString: %s, summaryString: %s",
+                            parsedOperation.get(), parsedOperation.get().asSummaryString()));
             boolean success = executeOperation(parsedOperation.get(), mode);
             if (exitOnFailure && !success) {
                 return false;
@@ -539,6 +543,10 @@ public class CliClient implements AutoCloseable {
     }
 
     private void callSelect(QueryOperation operation) {
+        printInfo(
+                String.format(
+                        "---------Execute query operation, toString: %s, summaryString: %s",
+                        operation, operation.asSummaryString()));
         final ResultDescriptor resultDesc = executor.executeQuery(sessionId, operation);
 
         if (resultDesc.isTableauMode()) {

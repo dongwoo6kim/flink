@@ -69,7 +69,18 @@ public class PlannerQueryOperation implements QueryOperation {
     @Override
     public String asSummaryString() {
         return OperationUtils.formatWithChildren(
-                "PlannerNode", Collections.emptyMap(), getChildren(), Operation::asSummaryString);
+                calciteTree.getRelTypeName()
+                        + ";"
+                        + calciteTree.getCorrelVariable()
+                        + ";"
+                        + calciteTree.explain()
+                        + calciteTree.toString()
+                        + ";"
+                        + ";"
+                        + "PlannerNode",
+                Collections.emptyMap(),
+                getChildren(),
+                Operation::asSummaryString);
     }
 
     @Override
