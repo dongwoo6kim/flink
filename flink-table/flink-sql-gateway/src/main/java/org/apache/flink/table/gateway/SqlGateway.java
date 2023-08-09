@@ -21,6 +21,8 @@ package org.apache.flink.table.gateway;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ConfigurationUtils;
+import org.apache.flink.runtime.security.SecurityConfiguration;
+import org.apache.flink.runtime.security.SecurityUtils;
 import org.apache.flink.runtime.util.EnvironmentInformation;
 import org.apache.flink.runtime.util.JvmShutdownSafeguard;
 import org.apache.flink.runtime.util.SignalHandler;
@@ -41,6 +43,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 /** Main entry point for the SQL Gateway. */
@@ -60,7 +63,7 @@ public class SqlGateway {
         this.latch = new CountDownLatch(1);
     }
 
-    public void start() throws Exception {
+    public Callable<Void> start() throws Exception {
         sessionManager.start();
 
         SqlGatewayService sqlGatewayService = new SqlGatewayServiceImpl(sessionManager);
@@ -75,6 +78,7 @@ public class SqlGateway {
             LOG.error("Failed to start the endpoints.", t);
             throw new SqlGatewayException("Failed to start the endpoints.", t);
         }
+        return null;
     }
 
     public void stop() {
@@ -109,18 +113,17 @@ public class SqlGateway {
         SignalHandler.register(LOG);
         JvmShutdownSafeguard.installAsShutdownHook(LOG);
 
+        Configuration dynamicConfiguration =
+                ConfigurationUtils.createConfiguration(cliOptions.getDynamicConfigs());
         DefaultContext defaultContext =
-                DefaultContext.load(
-                        ConfigurationUtils.createConfiguration(cliOptions.getDynamicConfigs()),
-                        Collections.emptyList(),
-                        true,
-                        true);
+                DefaultContext.load(dynamicConfiguration, Collections.emptyList(), true, true);
         SqlGateway gateway =
                 new SqlGateway(
                         defaultContext.getFlinkConfig(), SessionManager.create(defaultContext));
         try {
             Runtime.getRuntime().addShutdownHook(new ShutdownThread(gateway));
-            gateway.start();
+            SecurityUtils.install(new SecurityConfiguration(defaultContext.getFlinkConfig()));
+            SecurityUtils.getInstalledContext().runSecured(gateway::start);
             gateway.waitUntilStop();
         } catch (Throwable t) {
             // User uses ctrl + c to cancel the Gateway manually
