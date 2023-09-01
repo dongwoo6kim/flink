@@ -1084,6 +1084,8 @@ public class DefaultExecutionGraph implements ExecutionGraph, InternalExecutionG
         if (failedExecution != null
                 && (failedExecution.getState() == ExecutionState.RUNNING
                         || failedExecution.getState() == ExecutionState.INITIALIZING)) {
+            LOG.info(
+                    "failGlobal is executed in DefaultExecutionGraph.failGlobalIfExecutionIsStillRunning()");
             failGlobal(cause);
         } else {
             LOG.debug(

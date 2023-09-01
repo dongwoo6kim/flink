@@ -90,7 +90,14 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
 
     @Override
     void onFailure(Throwable cause) {
-        FailureResultUtil.restartOrFail(context.howToHandleFailure(cause), context, this);
+        getLogger().info("onFailure() called in {}", this.getClass().getName());
+        // Trigger savepoint by cause message
+        // TODO: Trigger savepoint only if failure is caused by checkpoint async phase
+        if (cause.getMessage().startsWith("Exceeded checkpoint tolerable failure threshold")) {
+            stopWithSavepoint(null, true, SavepointFormatType.CANONICAL);
+        } else {
+            FailureResultUtil.restartOrFail(context.howToHandleFailure(cause), context, this);
+        }
     }
 
     @Override

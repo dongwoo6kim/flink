@@ -489,6 +489,10 @@ public class AdaptiveScheduler
 
     @Override
     public void handleGlobalFailure(Throwable cause) {
+        LOG.info("AdaptiveScheduler.handleGlobalFailure() is called due to {}", cause.getMessage());
+        LOG.info(
+                "state.handleGlobalFailure() is going to be called with state: {}",
+                state.getClass().getName());
         state.handleGlobalFailure(cause);
     }
 

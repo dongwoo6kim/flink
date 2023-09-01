@@ -333,6 +333,7 @@ abstract class StateWithExecutionGraph implements State {
 
     @Override
     public void handleGlobalFailure(Throwable cause) {
+        logger.warn("StateWithExecutionGraph.handleGlobalFailure() is called");
         failureCollection.add(ExceptionHistoryEntry.createGlobal(cause));
         onFailure(cause);
     }
