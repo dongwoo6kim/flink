@@ -33,8 +33,14 @@ import javax.annotation.Nonnull;
 
 import java.io.Closeable;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * This class implements the logic that creates (and potentially restores) a state backend. The
@@ -93,73 +99,92 @@ public class BackendRestorerProcedure<T extends Closeable & Disposable, S extend
     @Nonnull
     public T createAndRestore(@Nonnull List<? extends Collection<S>> restoreOptions)
             throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Callable<T> callable =
+                () -> {
+                    int alternativeIdx = 0;
 
-        if (restoreOptions.isEmpty()) {
-            restoreOptions = Collections.singletonList(Collections.emptyList());
-        }
+                    Exception collectedException = null;
 
-        int alternativeIdx = 0;
+                    while (alternativeIdx < restoreOptions.size()) {
 
-        Exception collectedException = null;
+                        Collection<S> restoreState = restoreOptions.get(alternativeIdx);
 
-        while (alternativeIdx < restoreOptions.size()) {
+                        ++alternativeIdx;
 
-            Collection<S> restoreState = restoreOptions.get(alternativeIdx);
+                        // IMPORTANT: please be careful when modifying the log statements because
+                        // they are used
+                        // for validation in
+                        // the automatic end-to-end tests. Those tests might fail if they are not
+                        // aligned with
+                        // the log message!
+                        if (restoreState.isEmpty()) {
+                            LOG.debug("Creating {} with empty state.", logDescription);
+                        } else {
+                            if (LOG.isTraceEnabled()) {
+                                LOG.trace(
+                                        "Creating {} and restoring with state {} from alternative ({}/{}).",
+                                        logDescription,
+                                        restoreState,
+                                        alternativeIdx,
+                                        restoreOptions.size());
+                            } else {
+                                LOG.debug(
+                                        "Creating {} and restoring with state from alternative ({}/{}).",
+                                        logDescription,
+                                        alternativeIdx,
+                                        restoreOptions.size());
+                            }
+                        }
 
-            ++alternativeIdx;
+                        try {
+                            return attemptCreateAndRestore(restoreState);
+                        } catch (Exception ex) {
 
-            // IMPORTANT: please be careful when modifying the log statements because they are used
-            // for validation in
-            // the automatic end-to-end tests. Those tests might fail if they are not aligned with
-            // the log message!
-            if (restoreState.isEmpty()) {
-                LOG.debug("Creating {} with empty state.", logDescription);
-            } else {
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace(
-                            "Creating {} and restoring with state {} from alternative ({}/{}).",
-                            logDescription,
-                            restoreState,
-                            alternativeIdx,
-                            restoreOptions.size());
-                } else {
-                    LOG.debug(
-                            "Creating {} and restoring with state from alternative ({}/{}).",
-                            logDescription,
-                            alternativeIdx,
-                            restoreOptions.size());
-                }
-            }
+                            collectedException =
+                                    ExceptionUtils.firstOrSuppressed(ex, collectedException);
 
-            try {
-                return attemptCreateAndRestore(restoreState);
-            } catch (Exception ex) {
+                            if (backendCloseableRegistry.isClosed()) {
+                                throw new FlinkException(
+                                        "Stopping restore attempts for already cancelled task.",
+                                        collectedException);
+                            }
 
-                collectedException = ExceptionUtils.firstOrSuppressed(ex, collectedException);
-
-                if (backendCloseableRegistry.isClosed()) {
+                            LOG.warn(
+                                    "Exception while restoring {} from alternative ({}/{}), will retry while more "
+                                            + "alternatives are available.",
+                                    logDescription,
+                                    alternativeIdx,
+                                    restoreOptions.size(),
+                                    ex);
+                        }
+                    }
                     throw new FlinkException(
-                            "Stopping restore attempts for already cancelled task.",
+                            "Could not restore "
+                                    + logDescription
+                                    + " from any of the "
+                                    + restoreOptions.size()
+                                    + " provided restore options.",
                             collectedException);
-                }
-
-                LOG.warn(
-                        "Exception while restoring {} from alternative ({}/{}), will retry while more "
-                                + "alternatives are available.",
-                        logDescription,
-                        alternativeIdx,
-                        restoreOptions.size(),
-                        ex);
+                };
+        Future<T> future = executor.submit(callable);
+        try {
+            // Restore timeout configured to 5 seconds
+            return future.get(5, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            throw new FlinkException(
+                    "Restore Operation timed out after 5 seconds in BackendRestorerProcedure", e);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception) {
+                throw (Exception) cause;
+            } else {
+                throw new FlinkException("Unexpected error", cause);
             }
+        } finally {
+            executor.shutdownNow();
         }
-
-        throw new FlinkException(
-                "Could not restore "
-                        + logDescription
-                        + " from any of the "
-                        + restoreOptions.size()
-                        + " provided restore options.",
-                collectedException);
     }
 
     private T attemptCreateAndRestore(Collection<S> restoreState) throws Exception {
