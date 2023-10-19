@@ -169,13 +169,15 @@ public class BackendRestorerProcedure<T extends Closeable & Disposable, S extend
                 };
         Future<T> future = executor.submit(callable);
         try {
+            LOG.info("starting createAndRestore in BackendRestorerProcedure");
             // Restore timeout configured to 5 seconds
             return future.get(5, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
-            future.cancel(true);
+            LOG.warn("TimeoutException in  createAndRestore in BackendRestorerProcedure", e);
             throw new FlinkException(
                     "Restore Operation timed out after 5 seconds in BackendRestorerProcedure", e);
         } catch (ExecutionException e) {
+            LOG.warn("ExecutionException in  createAndRestore in BackendRestorerProcedure", e);
             Throwable cause = e.getCause();
             if (cause instanceof Exception) {
                 throw (Exception) cause;
@@ -183,6 +185,7 @@ public class BackendRestorerProcedure<T extends Closeable & Disposable, S extend
                 throw new FlinkException("Unexpected error", cause);
             }
         } finally {
+            LOG.warn("shutting down executor in  createAndRestore in BackendRestorerProcedure");
             executor.shutdownNow();
         }
     }
